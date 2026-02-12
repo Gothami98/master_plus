@@ -3,7 +3,7 @@ const bcrypt = require("bcryptjs");
 const db = require("../it_db");
 
 const router = express.Router();
-// Regsiter API nn
+// Regsiter API test
 router.post("/register", async (req, res) => {
   const { name, email, mobile, district, password } = req.body;
 
