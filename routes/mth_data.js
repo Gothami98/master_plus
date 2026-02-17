@@ -58,6 +58,16 @@ router.get("/students", (req, res) => {
 });
 
 // =========================
+// TOTAL STUDENT COUNT
+// =========================
+router.get("/students/count", (req, res) => {
+  db.query("SELECT COUNT(*) AS total FROM users", (err, results) => {
+    if (err) return res.status(500).json(err);
+    return res.json({ total: results[0]?.total || 0 });
+  });
+});
+
+// =========================
 // PAST PAPERS (ADMIN)
 // =========================
 router.get("/papers", (req, res) => {
