@@ -1,219 +1,116 @@
-const express = require('express');
-const db = require('../math_db');
+const express = require("express");
+const db = require("../math_db");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
+
+const ensureDir = (dirPath) => {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+};
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-
-    if (req.originalUrl.includes('papers'))
-      cb(null, 'uploads/papers');
-    else if (req.originalUrl.includes('tutes'))
-      cb(null, 'uploads/tutes');
-    else
-      cb(null, 'uploads/videos');
+    const uploadDir = path.join("uploads", "papers");
+    ensureDir(uploadDir);
+    cb(null, uploadDir);
   },
-
   filename: function (req, file, cb) {
     cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({ storage });
+
+// =========================
+// GET ALL STUDENTS
+// =========================
+router.get("/students", (req, res) => {
+  const { name, email } = req.query;
+
+  let sql = "SELECT id, name, email, mobile, district FROM users";
+  const params = [];
+  const where = [];
+
+  if (name) {
+    where.push("name LIKE ?");
+    params.push(`%${name}%`);
   }
-});
 
-const upload = multer({ storage: storage });
+  if (email) {
+    where.push("email LIKE ?");
+    params.push(`%${email}%`);
+  }
 
+  if (where.length > 0) {
+    sql += ` WHERE ${where.join(" AND ")}`;
+  }
 
+  sql += " ORDER BY id DESC";
 
-// =========================
-// GET ALL
-// =========================
-
-router.get('/papers', (req, res) => {
-  db.query('SELECT * FROM past_papers ORDER BY id DESC', (err, results) => {
+  db.query(sql, params, (err, results) => {
     if (err) return res.status(500).json(err);
-    res.json(results);
+    return res.json(results);
   });
 });
 
-
-router.get('/tutes', (req, res) => {
-  db.query('SELECT * FROM tutes ORDER BY id DESC', (err, results) => {
+// =========================
+// TOTAL STUDENT COUNT
+// =========================
+router.get("/students/count", (req, res) => {
+  db.query("SELECT COUNT(*) AS total FROM users", (err, results) => {
     if (err) return res.status(500).json(err);
-    res.json(results);
+    return res.json({ total: results[0]?.total || 0 });
   });
 });
 
-router.get('/videos', (req, res) => {
-  db.query('SELECT * FROM videos ORDER BY id DESC', (err, results) => {
+// =========================
+// PAST PAPERS (ADMIN)
+// =========================
+router.get("/papers/count", (req, res) => {
+  db.query("SELECT COUNT(*) AS total FROM past_papers", (err, results) => {
     if (err) return res.status(500).json(err);
-    res.json(results);
+    return res.json({ total: results[0]?.total || 0 });
   });
 });
 
-
-// =========================
-// ADD (ADMIN)
-// =========================
-
-router.post('/papers', upload.single('file'), (req, res) => {
-  const { title, year, subject } = req.body;
-
-  const file_url = req.file.path;
-
-  db.query(
-  'INSERT INTO past_papers (title, year, subject, file_url) VALUES (?, ?, ?, ?)',
-  [title, year, subject, file_url],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: 'Paper uploaded' });
-    }
-  );
-});
-
-
-router.post('/tutes', upload.single('file'), (req, res) => {
-  const { title, category, description } = req.body;
-
-  const file_url = req.file.path;
-
-  db.query(
-    'INSERT INTO tutes (title, category, description, file_url) VALUES (?, ?, ?, ?)',
-    [title, category, description, file_url],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: 'Tute uploaded' });
-    }
-  );
-});
-
-router.post('/videos', upload.single('file'), (req, res) => {
-  const { title, duration, category } = req.body;
-
-  const video_url = req.file.path;
-
-  db.query(
-    'INSERT INTO videos (title, duration, category, video_url) VALUES (?, ?, ?, ?)',
-    [title, duration, category, video_url],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: 'Video uploaded' });
-    }
-  );
-});
-
-
-
-// =========================
-// UPDATE (EDIT)
-// =========================
-
-router.put('/papers/:id', (req, res) => {
-  const { title, type, subject, file_url } = req.body;
-
-  db.query(
-    'UPDATE past_papers SET title=?, type=?, subject=?, file_url=? WHERE id=?',
-    [title, type, subject, file_url, req.params.id],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: 'Paper updated' });
-    }
-  );
-});
-
-
-router.put('/tutes/:id', (req, res) => {
-  const { title, category, description, file_url } = req.body;
-
-  db.query(
-    'UPDATE tutes SET title=?, category=?, description=?, file_url=? WHERE id=?',
-    [title, category, description, file_url, req.params.id],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: 'Tute updated' });
-    }
-  );
-});
-
-router.put('/videos/:id', (req, res) => {
-  const { title, duration, category, video_url } = req.body;
-
-  db.query(
-    'UPDATE videos SET title=?, duration=?, category=?, video_url=? WHERE id=?',
-    [title, duration, category, video_url, req.params.id],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: 'Video updated' });
-    }
-  );
-});
-
-
-// =========================
-// DELETE
-// =========================
-
-router.delete('/papers/:id', (req, res) => {
-  db.query('DELETE FROM past_papers WHERE id=?', [req.params.id], (err) => {
+router.get("/papers", (req, res) => {
+  db.query("SELECT * FROM past_papers ORDER BY id DESC", (err, results) => {
     if (err) return res.status(500).json(err);
-    res.json({ message: 'Paper deleted' });
+    return res.json(results);
   });
 });
 
+router.post("/papers", upload.single("file"), (req, res) => {
+  const { title, class_type, year, month, week } = req.body;
 
-router.delete('/tutes/:id', (req, res) => {
-  db.query('DELETE FROM tutes WHERE id=?', [req.params.id], (err) => {
-    if (err) return res.status(500).json(err);
-    res.json({ message: 'Tute deleted' });
-  });
-});
+  if (!req.file) {
+    return res.status(400).json({ message: "File is required" });
+  }
 
-router.delete('/videos/:id', (req, res) => {
-  db.query('DELETE FROM videos WHERE id=?', [req.params.id], (err) => {
-    if (err) return res.status(500).json(err);
-    res.json({ message: 'Video deleted' });
-  });
-});
-
-
-// =========================
-// VIDEO ACCESS CONTROL
-// =========================
-
-router.get('/video-access/:userId', (req, res) => {
-  db.query(
-    'SELECT video_id FROM student_video_access WHERE user_id=?',
-    [req.params.userId],
-    (err, results) => {
-      if (err) return res.status(500).json(err);
-      res.json(results.map(r => r.video_id));
-    }
-  );
-});
-
-router.post('/video-access', (req, res) => {
-  const { userId, videoId } = req.body;
+  const file_location = req.file.path;
 
   db.query(
-    'INSERT INTO student_video_access (user_id, video_id) VALUES (?, ?)',
-    [userId, videoId],
+    "INSERT INTO past_papers (title, class_type, year, month, week, file_location) VALUES (?, ?, ?, ?, ?, ?)",
+    [title, class_type, year, month, week, file_location],
     (err) => {
       if (err) return res.status(500).json(err);
-      res.json({ message: 'Access granted' });
+      return res.json({ message: "Paper uploaded" });
     }
   );
 });
 
-router.delete('/video-access', (req, res) => {
-  const { userId, videoId } = req.body;
-
-  db.query(
-    'DELETE FROM student_video_access WHERE user_id=? AND video_id=?',
-    [userId, videoId],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: 'Access removed' });
-    }
-  );
+// =========================
+// VIDEOS (COUNT)
+// =========================
+router.get("/videos/count", (req, res) => {
+  db.query("SELECT COUNT(*) AS total FROM videos", (err, results) => {
+    if (err) return res.status(500).json(err);
+    return res.json({ total: results[0]?.total || 0 });
+  });
 });
 
 module.exports = router;
