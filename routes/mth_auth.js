@@ -43,7 +43,7 @@ const sendResetEmail = async (to, resetLink) => {
 
 // Regsiter API test
 router.post("/register", async (req, res) => {
-  const { name, email, mobile, district, password } = req.body;
+  const { name, email, mobile, district, password, year } = req.body;
 
   try {
     db.query("SELECT * FROM users WHERE email=?", [email], async (err, result) => {
@@ -56,8 +56,8 @@ router.post("/register", async (req, res) => {
       const hashedPassword = await bcrypt.hash(password, 10);
 
       db.query(
-        "INSERT INTO users (name,email,mobile,district,password) VALUES (?,?,?,?,?)",
-        [name, email, mobile, district, hashedPassword],
+        "INSERT INTO users (name,email,mobile,district,password,year) VALUES (?,?,?,?,?,?)",
+      [name, email, mobile, district, hashedPassword, year || null],
         (insertErr) => {
           if (insertErr) return res.status(500).json(insertErr);
           return res.json({ message: "Registration successful" });
