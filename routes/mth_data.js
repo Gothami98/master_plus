@@ -68,12 +68,22 @@ router.get("/students/count", (req, res) => {
 });
 
 // =========================
-// PAST PAPERS (ADMIN)
+// CONTENT COUNTS (PAPERS + VIDEOS)
 // =========================
-router.get("/papers/count", (req, res) => {
-  db.query("SELECT COUNT(*) AS total FROM past_papers", (err, results) => {
+router.get("/content/count", (req, res) => {
+  const sql = `
+    SELECT
+      (SELECT COUNT(*) FROM past_papers) AS papers,
+      (SELECT COUNT(*) FROM videos) AS videos
+  `;
+
+  db.query(sql, (err, results) => {
     if (err) return res.status(500).json(err);
-    return res.json({ total: results[0]?.total || 0 });
+
+    return res.json({
+      papers: results[0]?.papers || 0,
+      videos: results[0]?.videos || 0,
+    });
   });
 });
 
@@ -101,16 +111,6 @@ router.post("/papers", upload.single("file"), (req, res) => {
       return res.json({ message: "Paper uploaded" });
     }
   );
-});
-
-// =========================
-// VIDEOS (COUNT)
-// =========================
-router.get("/videos/count", (req, res) => {
-  db.query("SELECT COUNT(*) AS total FROM videos", (err, results) => {
-    if (err) return res.status(500).json(err);
-    return res.json({ total: results[0]?.total || 0 });
-  });
 });
 
 module.exports = router;
