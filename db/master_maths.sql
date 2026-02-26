@@ -71,6 +71,28 @@ CREATE TABLE IF NOT EXISTS `student_video_access` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tasks`
+--
+
+DROP TABLE IF EXISTS `tasks`;
+CREATE TABLE IF NOT EXISTS `tasks` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `description` text,
+  `due_date` date DEFAULT NULL,
+  `is_completed` tinyint(1) DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_tasks_user_id` (`user_id`),
+  KEY `idx_tasks_is_completed` (`is_completed`),
+  CONSTRAINT `fk_tasks_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tutes`
 --
 
@@ -100,7 +122,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `district` varchar(100) DEFAULT NULL,
   `password` varchar(255) NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `year` int DEFAULT NULL,
+  `year` int NOT NULL DEFAULT '0',
   `reset_token` varchar(255) DEFAULT NULL,
   `reset_token_expiry` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -138,3 +160,4 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+

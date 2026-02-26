@@ -50,9 +50,9 @@ const sendResetEmail = async (to, resetLink) => {
   });
 };
 
-// Regsiter API test
+// Register API
 router.post("/register", async (req, res) => {
-  const { name, email, mobile, district, password, year } = req.body;
+  const { name, email, mobile, district, password, year } = req.body; // ✅ alYear
 
   try {
     db.query("SELECT * FROM users WHERE email=?", [email], async (err, result) => {
@@ -66,7 +66,7 @@ router.post("/register", async (req, res) => {
 
       db.query(
         "INSERT INTO users (name,email,mobile,district,password,year) VALUES (?,?,?,?,?,?)",
-        [name, email, mobile, district, hashedPassword, year || 0],
+        [name, email, mobile, district, hashedPassword, year], 
         (insertErr, insertResult) => {
           if (insertErr) return res.status(500).json(insertErr);
           return res.json(formatAuthUser({
@@ -75,7 +75,7 @@ router.post("/register", async (req, res) => {
             email,
             mobile,
             district,
-            year: year || 0,
+            year
           }));
         }
       );

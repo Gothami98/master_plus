@@ -57,35 +57,30 @@ router.get("/students", (req, res) => {
   });
 });
 
-// =========================
-// TOTAL STUDENT COUNT
-// =========================
-router.get("/students/count", (req, res) => {
-  db.query("SELECT COUNT(*) AS total FROM users", (err, results) => {
-    if (err) return res.status(500).json(err);
-    return res.json({ total: results[0]?.total || 0 });
-  });
-});
 
 // =========================
-// CONTENT COUNTS (PAPERS + VIDEOS)
+// GET CLASS MATRIX
 // =========================
-router.get("/content/count", (req, res) => {
+router.get("/get_class_matrix", (req, res) => {
   const sql = `
     SELECT
-      (SELECT COUNT(*) FROM past_papers) AS papers,
-      (SELECT COUNT(*) FROM videos) AS videos
+      (SELECT COUNT(*) FROM users) AS total_students,
+      (SELECT COUNT(*) FROM past_papers) AS total_papers,
+      (SELECT COUNT(*) FROM videos) AS total_videos
+
   `;
 
   db.query(sql, (err, results) => {
     if (err) return res.status(500).json(err);
 
     return res.json({
-      papers: results[0]?.papers || 0,
-      videos: results[0]?.videos || 0,
+      total_students: results[0]?.total_students || 0,
+      total_papers: results[0]?.total_papers || 0,
+      total_videos: results[0]?.total_videos || 0,
     });
   });
 });
+
 
 router.get("/papers", (req, res) => {
   db.query("SELECT * FROM past_papers ORDER BY id DESC", (err, results) => {
@@ -111,6 +106,113 @@ router.post("/papers", upload.single("file"), (req, res) => {
       return res.json({ message: "Paper uploaded" });
     }
   );
+});
+
+// =========================
+// STUDENT TASK MANAGER
+// =========================
+router.get("/tasks", (req, res) => {
+  const { user_id, status = "all" } = req.query;
+
+  if (!user_id) {
+    return res.status(400).json({ message: "user_id is required" });
+  }
+
+  let sql = `
+    SELECT id, user_id, title, description, due_date, is_completed, created_at, updated_at
+    FROM tasks
+    WHERE user_id = ?
+  `;
+  const params = [user_id];
+
+  if (status === "completed") {
+    sql += " AND is_completed = 1";
+  } else if (status === "pending") {
+    sql += " AND is_completed = 0";
+  }
+
+  sql += " ORDER BY is_completed ASC, due_date IS NULL ASC, due_date ASC, id DESC";
+
+  db.query(sql, params, (err, results) => {
+    if (err) return res.status(500).json(err);
+    return res.json(results);
+  });
+});
+
+router.post("/tasks", (req, res) => {
+  const { user_id, title, description = null, due_date = null } = req.body;
+
+  if (!user_id || !title) {
+    return res.status(400).json({ message: "user_id and title are required" });
+  }
+
+  db.query(
+    "INSERT INTO tasks (user_id, title, description, due_date) VALUES (?, ?, ?, ?)",
+    [user_id, title, description, due_date],
+    (err, result) => {
+      if (err) return res.status(500).json(err);
+      return res.json({ message: "Task created", id: result.insertId });
+    }
+  );
+});
+
+router.put("/tasks/:id", (req, res) => {
+  const { user_id, title, description = null, due_date = null } = req.body;
+  const { id } = req.params;
+
+  if (!user_id || !title) {
+    return res.status(400).json({ message: "user_id and title are required" });
+  }
+
+  db.query(
+    "UPDATE tasks SET title = ?, description = ?, due_date = ? WHERE id = ? AND user_id = ?",
+    [title, description, due_date, id, user_id],
+    (err, result) => {
+      if (err) return res.status(500).json(err);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      return res.json({ message: "Task updated" });
+    }
+  );
+});
+
+router.patch("/tasks/:id/completed", (req, res) => {
+  const { user_id, is_completed = true } = req.body;
+  const { id } = req.params;
+
+  if (!user_id) {
+    return res.status(400).json({ message: "user_id is required" });
+  }
+
+  db.query(
+    "UPDATE tasks SET is_completed = ? WHERE id = ? AND user_id = ?",
+    [is_completed ? 1 : 0, id, user_id],
+    (err, result) => {
+      if (err) return res.status(500).json(err);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      return res.json({ message: "Task status updated" });
+    }
+  );
+});
+
+router.delete("/tasks/:id", (req, res) => {
+  const { user_id } = req.query;
+  const { id } = req.params;
+
+  if (!user_id) {
+    return res.status(400).json({ message: "user_id is required" });
+  }
+
+  db.query("DELETE FROM tasks WHERE id = ? AND user_id = ?", [id, user_id], (err, result) => {
+    if (err) return res.status(500).json(err);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+    return res.json({ message: "Task deleted" });
+  });
 });
 
 module.exports = router;
