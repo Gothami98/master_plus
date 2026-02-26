@@ -6,6 +6,15 @@ const db = require("../math_db");
 
 const router = express.Router();
 
+const formatAuthUser = (user) => ({
+  id: String(user.id ?? ""),
+  name: user.name || "",
+  email: user.email || "",
+  mobile: user.mobile || "",
+  district: user.district || "",
+  alYear: user.year ?? 0,
+});
+
 const createTransporter = () => {
   const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS } = process.env;
 
@@ -57,10 +66,17 @@ router.post("/register", async (req, res) => {
 
       db.query(
         "INSERT INTO users (name,email,mobile,district,password,year) VALUES (?,?,?,?,?,?)",
-      [name, email, mobile, district, hashedPassword, year || null],
-        (insertErr) => {
+        [name, email, mobile, district, hashedPassword, year || 0],
+        (insertErr, insertResult) => {
           if (insertErr) return res.status(500).json(insertErr);
-          return res.json({ message: "Registration successful" });
+          return res.json(formatAuthUser({
+            id: insertResult.insertId,
+            name,
+            email,
+            mobile,
+            district,
+            year: year || 0,
+          }));
         }
       );
     });
@@ -92,14 +108,7 @@ router.post("/login", (req, res) => {
       return res.status(401).json({ message: "Invalid password" });
     }
 
-    return res.json({
-      message: "Login successful",
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-      },
-    });
+    return res.json(formatAuthUser(user));
   });
 });
 
