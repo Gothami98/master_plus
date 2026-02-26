@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Generation Time: Feb 12, 2026 at 10:08 AM
+-- Generation Time: Feb 24, 2026 at 02:35 PM
 -- Server version: 8.0.44
 -- PHP Version: 8.2.13
 
@@ -31,12 +31,28 @@ DROP TABLE IF EXISTS `past_papers`;
 CREATE TABLE IF NOT EXISTS `past_papers` (
   `id` int NOT NULL AUTO_INCREMENT,
   `title` varchar(255) NOT NULL,
+  `class_type` varchar(100) NOT NULL,
   `year` int NOT NULL,
-  `subject` varchar(100) DEFAULT NULL,
-  `file_url` varchar(500) DEFAULT NULL,
+  `month` varchar(20) NOT NULL,
+  `week` int NOT NULL,
+  `file_location` varchar(500) NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `past_papers`
+--
+
+INSERT INTO `past_papers` (`id`, `title`, `class_type`, `year`, `month`, `week`, `file_location`, `created_at`) VALUES
+(1, 'Algebra Past Paper', 'Theory', 2024, 'January', 1, 'uploads/papers/algebra_w1.pdf', '2026-02-17 04:05:14'),
+(2, 'Algebra Past Paper', 'Theory', 2024, 'January', 2, 'uploads/papers/algebra_w2.pdf', '2026-02-17 04:05:14'),
+(3, 'Geometry Revision Paper', 'Revision', 2024, 'February', 1, 'uploads/papers/geometry_rev1.pdf', '2026-02-17 04:05:14'),
+(4, 'Trigonometry Model Paper', 'Model', 2023, 'March', 3, 'uploads/papers/trigo_model_w3.pdf', '2026-02-17 04:05:14'),
+(5, 'Calculus Tute', 'Tute', 2025, 'April', 2, 'uploads/papers/calculus_tute_w2.pdf', '2026-02-17 04:05:14'),
+(6, 'Statistics Past Paper', 'Theory', 2023, 'May', 4, 'uploads/papers/statistics_w4.pdf', '2026-02-17 04:05:14'),
+(7, 'Probability Paper', 'Paper', 2024, 'June', 1, 'uploads/papers/probability_w1.pdf', '2026-02-17 04:05:14'),
+(8, 'Matrices Practice', 'Practice', 2025, 'July', 2, 'uploads/papers/matrices_w2.pdf', '2026-02-17 04:05:14');
 
 -- --------------------------------------------------------
 
@@ -84,16 +100,22 @@ CREATE TABLE IF NOT EXISTS `users` (
   `district` varchar(100) DEFAULT NULL,
   `password` varchar(255) NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `year` int DEFAULT NULL,
+  `reset_token` varchar(255) DEFAULT NULL,
+  `reset_token_expiry` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `name`, `email`, `mobile`, `district`, `password`, `created_at`) VALUES
-(1, 'Test User', 'testuser1@gmail.com', '0771234567', 'Colombo', '$2b$10$Tbdc/J59EMxRmfWAKzRp3untPWPrXRCUkg1FjnHzXhWk9Yl8S6bBu', '2026-02-12 09:57:49');
+INSERT INTO `users` (`id`, `name`, `email`, `mobile`, `district`, `password`, `created_at`, `year`, `reset_token`, `reset_token_expiry`) VALUES
+(1, 'Test User', 'testuser1@gmail.com', '0771234567', 'Colombo', '$2b$10$Tbdc/J59EMxRmfWAKzRp3untPWPrXRCUkg1FjnHzXhWk9Yl8S6bBu', '2026-02-12 09:57:49', NULL, NULL, NULL),
+(2, 'Maths Student 1', 'maths1@example.com', '0771112233', 'Galle', '$2b$10$dTLITrxOz0iynnPZz24DteqyBbQe4.J9y9Y7VtmFUNSrsp1xDq06S', '2026-02-16 14:00:56', 2026, '9ea02886e8fc8379f76fa792accde9f4398ee7b13ab18a4393b33ce9327447b3', '2026-02-16 21:38:18'),
+(3, 'Test User', 'test1@example.com', '0712345678', 'Colombo', '$2b$10$dHaNpo8x7o72376H6cwjzuQv1j82ytp4DF8NVr6l685QbtDws.Ka.', '2026-02-16 15:57:14', NULL, '19d45178397a5331faf0c1dc14e2a61c0e334b6fd49734d63867dc6894b1e79e', '2026-02-16 22:28:22'),
+(4, 'Gothami', 'gothami@gmail.com', '0771234567', 'Colombo', '$2b$10$8CACsxr1w0o.mbSzl/Ff1eAtfongQhu4fL42timNOe7XjD5A7MvJ.', '2026-02-24 14:19:05', 2026, NULL, NULL);
 
 -- --------------------------------------------------------
 
