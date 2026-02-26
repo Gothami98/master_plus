@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const db = require("../math_db");
+const { createAuthToken } = require("./mth_auth_middleware");
 
 const router = express.Router();
 
@@ -52,7 +53,10 @@ const sendResetEmail = async (to, resetLink) => {
 
 // Register API
 router.post("/register", async (req, res) => {
-  const { name, email, mobile, district, password, year } = req.body; // ✅ alYear
+  const { name, email, mobile, district, password } = req.body;
+  const rawYear = req.body.year ?? req.body.alYear;
+  const parsedYear = Number.parseInt(rawYear, 10);
+  const safeYear = Number.isInteger(parsedYear) && parsedYear >= 0 ? parsedYear : 0;
 
   try {
     db.query("SELECT * FROM users WHERE email=?", [email], async (err, result) => {
@@ -66,17 +70,23 @@ router.post("/register", async (req, res) => {
 
       db.query(
         "INSERT INTO users (name,email,mobile,district,password,year) VALUES (?,?,?,?,?,?)",
-        [name, email, mobile, district, hashedPassword, year], 
+        [name, email, mobile, district, hashedPassword, safeYear],
         (insertErr, insertResult) => {
           if (insertErr) return res.status(500).json(insertErr);
-          return res.json(formatAuthUser({
+
+          const user = formatAuthUser({
             id: insertResult.insertId,
             name,
             email,
             mobile,
             district,
-            year
-          }));
+            year: safeYear,
+          });
+
+          return res.json({
+            ...user,
+            token: createAuthToken(insertResult.insertId),
+          });
         }
       );
     });
@@ -108,7 +118,12 @@ router.post("/login", (req, res) => {
       return res.status(401).json({ message: "Invalid password" });
     }
 
-    return res.json(formatAuthUser(user));
+    const formattedUser = formatAuthUser(user);
+
+    return res.json({
+      ...formattedUser,
+      token: createAuthToken(user.id),
+    });
   });
 });
 

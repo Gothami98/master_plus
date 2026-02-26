@@ -3,6 +3,7 @@ const db = require("../math_db");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const { requireMathsAuth } = require("./mth_auth_middleware");
 
 const router = express.Router();
 
@@ -111,19 +112,18 @@ router.post("/papers", upload.single("file"), (req, res) => {
 // =========================
 // STUDENT TASK MANAGER
 // =========================
-router.get("/tasks", (req, res) => {
-  const { user_id, status = "all" } = req.query;
+router.use("/tasks", requireMathsAuth);
 
-  if (!user_id) {
-    return res.status(400).json({ message: "user_id is required" });
-  }
+router.get("/tasks", (req, res) => {
+  const { status = "all" } = req.query;
+  const authUserId = req.authUserId;
 
   let sql = `
     SELECT id, user_id, title, description, due_date, is_completed, created_at, updated_at
     FROM tasks
     WHERE user_id = ?
   `;
-  const params = [user_id];
+  const params = [authUserId];
 
   if (status === "completed") {
     sql += " AND is_completed = 1";
@@ -140,15 +140,16 @@ router.get("/tasks", (req, res) => {
 });
 
 router.post("/tasks", (req, res) => {
-  const { user_id, title, description = null, due_date = null } = req.body;
+  const { title, description = null, due_date = null } = req.body;
+  const authUserId = req.authUserId;
 
-  if (!user_id || !title) {
-    return res.status(400).json({ message: "user_id and title are required" });
+  if (!title) {
+    return res.status(400).json({ message: "title is required" });
   }
 
   db.query(
     "INSERT INTO tasks (user_id, title, description, due_date) VALUES (?, ?, ?, ?)",
-    [user_id, title, description, due_date],
+    [authUserId, title, description, due_date],
     (err, result) => {
       if (err) return res.status(500).json(err);
       return res.json({ message: "Task created", id: result.insertId });
@@ -157,16 +158,17 @@ router.post("/tasks", (req, res) => {
 });
 
 router.put("/tasks/:id", (req, res) => {
-  const { user_id, title, description = null, due_date = null } = req.body;
+  const { title, description = null, due_date = null } = req.body;
   const { id } = req.params;
+  const authUserId = req.authUserId;
 
-  if (!user_id || !title) {
-    return res.status(400).json({ message: "user_id and title are required" });
+  if (!title) {
+    return res.status(400).json({ message: "title is required" });
   }
 
   db.query(
     "UPDATE tasks SET title = ?, description = ?, due_date = ? WHERE id = ? AND user_id = ?",
-    [title, description, due_date, id, user_id],
+    [title, description, due_date, id, authUserId],
     (err, result) => {
       if (err) return res.status(500).json(err);
       if (result.affectedRows === 0) {
@@ -178,16 +180,13 @@ router.put("/tasks/:id", (req, res) => {
 });
 
 router.patch("/tasks/:id/completed", (req, res) => {
-  const { user_id, is_completed = true } = req.body;
+  const { is_completed = true } = req.body;
   const { id } = req.params;
-
-  if (!user_id) {
-    return res.status(400).json({ message: "user_id is required" });
-  }
+  const authUserId = req.authUserId;
 
   db.query(
     "UPDATE tasks SET is_completed = ? WHERE id = ? AND user_id = ?",
-    [is_completed ? 1 : 0, id, user_id],
+    [is_completed ? 1 : 0, id, authUserId],
     (err, result) => {
       if (err) return res.status(500).json(err);
       if (result.affectedRows === 0) {
@@ -199,14 +198,10 @@ router.patch("/tasks/:id/completed", (req, res) => {
 });
 
 router.delete("/tasks/:id", (req, res) => {
-  const { user_id } = req.query;
   const { id } = req.params;
+  const authUserId = req.authUserId;
 
-  if (!user_id) {
-    return res.status(400).json({ message: "user_id is required" });
-  }
-
-  db.query("DELETE FROM tasks WHERE id = ? AND user_id = ?", [id, user_id], (err, result) => {
+  db.query("DELETE FROM tasks WHERE id = ? AND user_id = ?", [id, authUserId], (err, result) => {
     if (err) return res.status(500).json(err);
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Task not found" });
