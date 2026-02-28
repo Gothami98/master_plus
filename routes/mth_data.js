@@ -109,23 +109,52 @@ router.post("/papers", upload.single("file"), (req, res) => {
   );
 });
 
-router.put("/papers/:id", (req, res) => {
-  const { title, class_type, year, month, week, file_location } = req.body;
+router.put("/papers/:id", requireMathsAuth, upload.single("file"), (req, res) => {
+  const { title, class_type, year, month, week } = req.body;
+
+  let file_location = req.body.file_location;
+
+  if (req.file) {
+    file_location = req.file.path;
+  }
 
   db.query(
     "UPDATE past_papers SET title=?, class_type=?, year=?, month=?, week=?, file_location=? WHERE id=?",
     [title, class_type, year, month, week, file_location, req.params.id],
     (err) => {
       if (err) return res.status(500).json(err);
-      return res.json({ message: "Paper updated" });
+      res.json({ message: "Paper updated" });
     }
   );
 });
 
-router.delete("/papers/:id", (req, res) => {
-  db.query("DELETE FROM past_papers WHERE id=?", [req.params.id], (err) => {
+// =========================
+// DELETE PAPER (SAFE)
+// =========================
+router.delete("/papers/:id", requireMathsAuth, (req, res) => {
+  const id = req.params.id;
+
+  // 1. get file path
+  db.query("SELECT file_location FROM past_papers WHERE id=?", [id], (err, results) => {
     if (err) return res.status(500).json(err);
-    return res.json({ message: "Paper deleted" });
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Paper not found" });
+    }
+
+    const filePath = results[0].file_location;
+
+    // 2. delete db record
+    db.query("DELETE FROM past_papers WHERE id=?", [id], (err2) => {
+      if (err2) return res.status(500).json(err2);
+
+      // 3. delete file from uploads folder
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      return res.json({ message: "Paper deleted successfully" });
+    });
   });
 });
 
