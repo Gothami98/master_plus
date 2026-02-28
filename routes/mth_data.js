@@ -26,6 +26,19 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+const tuteStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join("uploads", "tutes");
+    ensureDir(uploadDir);
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+
+const uploadTute = multer({ storage: tuteStorage });
+
 // =========================
 // GET ALL STUDENTS
 // =========================
@@ -82,7 +95,7 @@ router.get("/get_class_matrix", (req, res) => {
   });
 });
 
-
+// Paper API
 router.get("/papers", (req, res) => {
   db.query("SELECT * FROM past_papers ORDER BY id DESC", (err, results) => {
     if (err) return res.status(500).json(err);
@@ -128,9 +141,7 @@ router.put("/papers/:id", requireMathsAuth, upload.single("file"), (req, res) =>
   );
 });
 
-// =========================
-// DELETE PAPER (SAFE)
-// =========================
+
 router.delete("/papers/:id", requireMathsAuth, (req, res) => {
   const id = req.params.id;
 
@@ -154,6 +165,131 @@ router.delete("/papers/:id", requireMathsAuth, (req, res) => {
       }
 
       return res.json({ message: "Paper deleted successfully" });
+    });
+  });
+});
+
+// Tute API
+router.get("/tutes", (req, res) => {
+  db.query("SELECT * FROM tutes ORDER BY id DESC", (err, results) => {
+    if (err) return res.status(500).json(err);
+    return res.json(results);
+  });
+});
+
+router.post("/tutes", uploadTute.single("file"), (req, res) => {
+  const { title, category, description, year, month, week } = req.body;
+
+  if (!req.file) {
+    return res.status(400).json({ message: "File is required" });
+  }
+
+  const file_location = req.file.path;
+
+  db.query(
+    "INSERT INTO tutes (title, category, description, year, month, week, file_location) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [title, category, description, year, month, week, file_location],
+    (err) => {
+      if (err) return res.status(500).json(err);
+      return res.json({ message: "Tute uploaded" });
+    }
+  );
+});
+
+router.put("/tutes/:id", requireMathsAuth, uploadTute.single("file"), (req, res) => {
+  const { title, category, description, year, month, week } = req.body;
+  let file_location = req.body.file_location;
+
+  if (req.file) {
+    file_location = req.file.path;
+  }
+
+  db.query(
+    "UPDATE tutes SET title=?, category=?, description=?, year=?, month=?, week=?, file_location=? WHERE id=?",
+    [title, category, description, year, month, week, file_location, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: "Tute updated" });
+    }
+  );
+});
+
+router.delete("/tutes/:id", requireMathsAuth, (req, res) => {
+  const id = req.params.id;
+
+  db.query("SELECT file_location FROM tutes WHERE id=?", [id], (err, results) => {
+    if (err) return res.status(500).json(err);
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Tute not found" });
+    }
+
+    const filePath = results[0].file_location;
+
+    db.query("DELETE FROM tutes WHERE id=?", [id], (err2) => {
+      if (err2) return res.status(500).json(err2);
+
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      return res.json({ message: "Tute deleted successfully" });
+    });
+  });
+});
+
+// Video API
+router.get("/videos", (req, res) => {
+  db.query("SELECT * FROM videos ORDER BY id DESC", (err, results) => {
+    if (err) return res.status(500).json(err);
+    return res.json(results);
+  });
+});
+
+router.post("/videos", (req, res) => {
+  const { title, category, year, month, week, duration, video_url } = req.body;
+
+  if (!video_url) {
+    return res.status(400).json({ message: "video_url is required" });
+  }
+
+  db.query(
+    "INSERT INTO videos (title, category, year, month, week, duration, video_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [title, category, year, month, week, duration, video_url],
+    (err) => {
+      if (err) return res.status(500).json(err);
+      return res.json({ message: "Video uploaded" });
+    }
+  );
+});
+
+router.put("/videos/:id", requireMathsAuth, (req, res) => {
+  const { title, category, year, month, week, duration, video_url } = req.body;
+
+  db.query(
+    "UPDATE videos SET title=?, category=?, year=?, month=?, week=?, duration=?, video_url=? WHERE id=?",
+    [title, category, year, month, week, duration, video_url, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: "Video updated" });
+    }
+  );
+});
+
+router.delete("/videos/:id", requireMathsAuth, (req, res) => {
+  const id = req.params.id;
+
+  db.query("SELECT id FROM videos WHERE id=?", [id], (err, results) => {
+    if (err) return res.status(500).json(err);
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Video not found" });
+    }
+
+    db.query("DELETE FROM videos WHERE id=?", [id], (err2) => {
+      if (err2) return res.status(500).json(err2);
+
+      return res.json({ message: "Video deleted successfully" });
     });
   });
 });
