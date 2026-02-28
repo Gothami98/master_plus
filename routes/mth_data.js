@@ -82,7 +82,7 @@ router.get("/get_class_matrix", (req, res) => {
   });
 });
 
-
+// Paper API
 router.get("/papers", (req, res) => {
   db.query("SELECT * FROM past_papers ORDER BY id DESC", (err, results) => {
     if (err) return res.status(500).json(err);
@@ -128,9 +128,7 @@ router.put("/papers/:id", requireMathsAuth, upload.single("file"), (req, res) =>
   );
 });
 
-// =========================
-// DELETE PAPER (SAFE)
-// =========================
+
 router.delete("/papers/:id", requireMathsAuth, (req, res) => {
   const id = req.params.id;
 
@@ -154,6 +152,62 @@ router.delete("/papers/:id", requireMathsAuth, (req, res) => {
       }
 
       return res.json({ message: "Paper deleted successfully" });
+    });
+  });
+});
+
+// Video API
+router.get("/videos", (req, res) => {
+  db.query("SELECT * FROM videos ORDER BY id DESC", (err, results) => {
+    if (err) return res.status(500).json(err);
+    return res.json(results);
+  });
+});
+
+router.post("/videos", (req, res) => {
+  const { title, category, year, month, week, duration, video_url } = req.body;
+
+  if (!video_url) {
+    return res.status(400).json({ message: "video_url is required" });
+  }
+
+  db.query(
+    "INSERT INTO videos (title, category, year, month, week, duration, video_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [title, category, year, month, week, duration, video_url],
+    (err) => {
+      if (err) return res.status(500).json(err);
+      return res.json({ message: "Video uploaded" });
+    }
+  );
+});
+
+router.put("/videos/:id", requireMathsAuth, (req, res) => {
+  const { title, category, year, month, week, duration, video_url } = req.body;
+
+  db.query(
+    "UPDATE videos SET title=?, category=?, year=?, month=?, week=?, duration=?, video_url=? WHERE id=?",
+    [title, category, year, month, week, duration, video_url, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: "Video updated" });
+    }
+  );
+});
+
+router.delete("/videos/:id", requireMathsAuth, (req, res) => {
+  const id = req.params.id;
+
+  db.query("SELECT id FROM videos WHERE id=?", [id], (err, results) => {
+    if (err) return res.status(500).json(err);
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Video not found" });
+    }
+
+    db.query("DELETE FROM videos WHERE id=?", [id], (err2) => {
+      if (err2) return res.status(500).json(err2);
+
+      return res.json({ message: "Video deleted successfully" });
     });
   });
 });
