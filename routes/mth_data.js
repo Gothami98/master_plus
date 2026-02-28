@@ -3,6 +3,7 @@ const db = require("../math_db");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const { requireMathsAuth } = require("./mth_auth_middleware");
 
 const router = express.Router();
 
@@ -108,111 +109,55 @@ router.post("/papers", upload.single("file"), (req, res) => {
   );
 });
 
-// =========================
-// STUDENT TASK MANAGER
-// =========================
-router.get("/tasks", (req, res) => {
-  const { user_id, status = "all" } = req.query;
+router.put("/papers/:id", requireMathsAuth, upload.single("file"), (req, res) => {
+  const { title, class_type, year, month, week } = req.body;
 
-  if (!user_id) {
-    return res.status(400).json({ message: "user_id is required" });
+  let file_location = req.body.file_location;
+
+  if (req.file) {
+    file_location = req.file.path;
   }
 
-  let sql = `
-    SELECT id, user_id, title, description, due_date, is_completed, created_at, updated_at
-    FROM tasks
-    WHERE user_id = ?
-  `;
-  const params = [user_id];
+  db.query(
+    "UPDATE past_papers SET title=?, class_type=?, year=?, month=?, week=?, file_location=? WHERE id=?",
+    [title, class_type, year, month, week, file_location, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: "Paper updated" });
+    }
+  );
+});
 
-  if (status === "completed") {
-    sql += " AND is_completed = 1";
-  } else if (status === "pending") {
-    sql += " AND is_completed = 0";
-  }
+// =========================
+// DELETE PAPER (SAFE)
+// =========================
+router.delete("/papers/:id", requireMathsAuth, (req, res) => {
+  const id = req.params.id;
 
-  sql += " ORDER BY is_completed ASC, due_date IS NULL ASC, due_date ASC, id DESC";
-
-  db.query(sql, params, (err, results) => {
+  // 1. get file path
+  db.query("SELECT file_location FROM past_papers WHERE id=?", [id], (err, results) => {
     if (err) return res.status(500).json(err);
-    return res.json(results);
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Paper not found" });
+    }
+
+    const filePath = results[0].file_location;
+
+    // 2. delete db record
+    db.query("DELETE FROM past_papers WHERE id=?", [id], (err2) => {
+      if (err2) return res.status(500).json(err2);
+
+      // 3. delete file from uploads folder
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      return res.json({ message: "Paper deleted successfully" });
+    });
   });
 });
 
-router.post("/tasks", (req, res) => {
-  const { user_id, title, description = null, due_date = null } = req.body;
 
-  if (!user_id || !title) {
-    return res.status(400).json({ message: "user_id and title are required" });
-  }
-
-  db.query(
-    "INSERT INTO tasks (user_id, title, description, due_date) VALUES (?, ?, ?, ?)",
-    [user_id, title, description, due_date],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-      return res.json({ message: "Task created", id: result.insertId });
-    }
-  );
-});
-
-router.put("/tasks/:id", (req, res) => {
-  const { user_id, title, description = null, due_date = null } = req.body;
-  const { id } = req.params;
-
-  if (!user_id || !title) {
-    return res.status(400).json({ message: "user_id and title are required" });
-  }
-
-  db.query(
-    "UPDATE tasks SET title = ?, description = ?, due_date = ? WHERE id = ? AND user_id = ?",
-    [title, description, due_date, id, user_id],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Task not found" });
-      }
-      return res.json({ message: "Task updated" });
-    }
-  );
-});
-
-router.patch("/tasks/:id/completed", (req, res) => {
-  const { user_id, is_completed = true } = req.body;
-  const { id } = req.params;
-
-  if (!user_id) {
-    return res.status(400).json({ message: "user_id is required" });
-  }
-
-  db.query(
-    "UPDATE tasks SET is_completed = ? WHERE id = ? AND user_id = ?",
-    [is_completed ? 1 : 0, id, user_id],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Task not found" });
-      }
-      return res.json({ message: "Task status updated" });
-    }
-  );
-});
-
-router.delete("/tasks/:id", (req, res) => {
-  const { user_id } = req.query;
-  const { id } = req.params;
-
-  if (!user_id) {
-    return res.status(400).json({ message: "user_id is required" });
-  }
-
-  db.query("DELETE FROM tasks WHERE id = ? AND user_id = ?", [id, user_id], (err, result) => {
-    if (err) return res.status(500).json(err);
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Task not found" });
-    }
-    return res.json({ message: "Task deleted" });
-  });
-});
 
 module.exports = router;

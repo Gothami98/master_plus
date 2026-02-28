@@ -19,7 +19,6 @@ app.use("/uploads", express.static("uploads"));
 
 // IT
 const itAuthRoutes = require("./routes/it_auth");
-const itDataRoutes = require("./routes/it_data");
 
 // MATHS
 const mathsAuthRoutes = require("./routes/mth_auth");
@@ -32,7 +31,6 @@ const mathsDataRoutes = require("./routes/mth_data");
 
 // IT routes
 app.use("/it/auth", itAuthRoutes);
-app.use("/it/api", itDataRoutes);
 
 // Maths routes
 app.use("/maths/auth", mathsAuthRoutes);
