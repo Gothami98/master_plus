@@ -295,5 +295,195 @@ router.delete("/videos/:id", requireMathsAuth, (req, res) => {
 });
 
 
+// =========================
+// VIDEO ACCESS MANAGEMENT
+// =========================
+
+// GET all access records (admin view) - optionally filter by week/year
+router.get("/video-access", requireMathsAuth, (req, res) => {
+  const { week, year, user_id } = req.query;
+
+  let sql = `
+    SELECT 
+      va.id,
+      va.user_id,
+      va.video_id,
+      va.is_active,
+      va.created_at,
+      u.name AS student_name,
+      u.email AS student_email,
+      v.title AS video_title,
+      v.week,
+      v.year,
+      v.category
+    FROM video_access va
+    JOIN users u ON va.user_id = u.id
+    JOIN videos v ON va.video_id = v.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (week) { sql += " AND v.week = ?"; params.push(week); }
+  if (year) { sql += " AND v.year = ?"; params.push(year); }
+  if (user_id) { sql += " AND va.user_id = ?"; params.push(user_id); }
+
+  sql += " ORDER BY va.id DESC";
+
+  db.query(sql, params, (err, results) => {
+    if (err) return res.status(500).json(err);
+    return res.json(results);
+  });
+});
+
+// GET videos accessible by a specific student (used on student side)
+router.get("/video-access/student/:user_id", (req, res) => {
+  const { user_id } = req.params;
+
+  const sql = `
+    SELECT 
+      v.id,
+      v.title,
+      v.category,
+      v.year,
+      v.month,
+      v.week,
+      v.duration,
+      v.video_url,
+      va.is_active
+    FROM video_access va
+    JOIN videos v ON va.video_id = v.id
+    WHERE va.user_id = ? AND va.is_active = 1
+    ORDER BY v.id DESC
+  `;
+
+  db.query(sql, [user_id], (err, results) => {
+    if (err) return res.status(500).json(err);
+    return res.json(results);
+  });
+});
+
+// GET all students with their access status for a specific video
+router.get("/video-access/video/:video_id", requireMathsAuth, (req, res) => {
+  const { video_id } = req.params;
+
+  const sql = `
+    SELECT 
+      u.id AS user_id,
+      u.name,
+      u.email,
+      u.district,
+      COALESCE(va.is_active, 0) AS has_access,
+      va.id AS access_id
+    FROM users u
+    LEFT JOIN video_access va ON u.id = va.user_id AND va.video_id = ?
+    ORDER BY u.name ASC
+  `;
+
+  db.query(sql, [video_id], (err, results) => {
+    if (err) return res.status(500).json(err);
+    return res.json(results);
+  });
+});
+
+// POST - Grant access to a student for a video
+router.post("/video-access", requireMathsAuth, (req, res) => {
+  const { user_id, video_id } = req.body;
+
+  if (!user_id || !video_id) {
+    return res.status(400).json({ message: "user_id and video_id are required" });
+  }
+
+  // Use INSERT ... ON DUPLICATE KEY to avoid duplicates
+  const sql = `
+    INSERT INTO video_access (user_id, video_id, is_active)
+    VALUES (?, ?, 1)
+    ON DUPLICATE KEY UPDATE is_active = 1
+  `;
+
+  db.query(sql, [user_id, video_id], (err) => {
+    if (err) return res.status(500).json(err);
+    return res.json({ message: "Access granted successfully" });
+  });
+});
+
+// POST - Bulk grant access (multiple students for one video)
+router.post("/video-access/bulk", requireMathsAuth, (req, res) => {
+  const { user_ids, video_id } = req.body;
+
+  if (!user_ids || !Array.isArray(user_ids) || user_ids.length === 0 || !video_id) {
+    return res.status(400).json({ message: "user_ids (array) and video_id are required" });
+  }
+
+  const values = user_ids.map((uid) => [uid, video_id, 1]);
+
+  const sql = `
+    INSERT INTO video_access (user_id, video_id, is_active)
+    VALUES ?
+    ON DUPLICATE KEY UPDATE is_active = 1
+  `;
+
+  db.query(sql, [values], (err) => {
+    if (err) return res.status(500).json(err);
+    return res.json({ message: `Access granted to ${user_ids.length} student(s)` });
+  });
+});
+
+// PATCH - Toggle access on/off for a student (admin can revoke without deleting)
+router.patch("/video-access/:id/toggle", requireMathsAuth, (req, res) => {
+  const { id } = req.params;
+
+  db.query("SELECT is_active FROM video_access WHERE id = ?", [id], (err, results) => {
+    if (err) return res.status(500).json(err);
+    if (results.length === 0) return res.status(404).json({ message: "Access record not found" });
+
+    const newStatus = results[0].is_active === 1 ? 0 : 1;
+
+    db.query("UPDATE video_access SET is_active = ? WHERE id = ?", [newStatus, id], (err2) => {
+      if (err2) return res.status(500).json(err2);
+      return res.json({ message: `Access ${newStatus === 1 ? "enabled" : "disabled"}`, is_active: newStatus });
+    });
+  });
+});
+
+// PATCH - Directly set access status (active/inactive)
+router.patch("/video-access/:id/status", requireMathsAuth, (req, res) => {
+  const { id } = req.params;
+  const { is_active } = req.body;
+
+  if (is_active === undefined) {
+    return res.status(400).json({ message: "is_active is required (0 or 1)" });
+  }
+
+  db.query("UPDATE video_access SET is_active = ? WHERE id = ?", [is_active, id], (err) => {
+    if (err) return res.status(500).json(err);
+    return res.json({ message: "Access status updated" });
+  });
+});
+
+// DELETE - Completely remove access record
+router.delete("/video-access/:id", requireMathsAuth, (req, res) => {
+  const { id } = req.params;
+
+  db.query("DELETE FROM video_access WHERE id = ?", [id], (err, result) => {
+    if (err) return res.status(500).json(err);
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Access record not found" });
+    return res.json({ message: "Access removed successfully" });
+  });
+});
+
+// DELETE - Revoke access by user_id + video_id directly
+router.delete("/video-access/revoke", requireMathsAuth, (req, res) => {
+  const { user_id, video_id } = req.body;
+
+  if (!user_id || !video_id) {
+    return res.status(400).json({ message: "user_id and video_id are required" });
+  }
+
+  db.query("DELETE FROM video_access WHERE user_id = ? AND video_id = ?", [user_id, video_id], (err, result) => {
+    if (err) return res.status(500).json(err);
+    if (result.affectedRows === 0) return res.status(404).json({ message: "No access record found" });
+    return res.json({ message: "Access revoked successfully" });
+  });
+});
 
 module.exports = router;
